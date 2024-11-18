@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alapkonfig generator</title>
+<style>body{margin:0;background-color:black;display:flex;flex-direction:column;align-items:center;}*{color:white;}p{margin:0;}
+h1{text-align:center;font-size:50px;font-family:sans-serif;}
+button{width:fit-content;height:30px;font-size:18px;background-color:gray;border-radius:4px;color:black;user-select:none;cursor:pointer;;&:focus{outline:none;}}
+#gen{width:140px;height:45px;font-size:28px;margin:20px 0;border-radius:10px;}
+input[type="text"]{font-size:22px;width:200px;height:30px;color:white;background-color:#262626;border-radius:5px 5px 0 0;
+border:none;border-bottom:2px solid white;&:focus{border:none;outline:1px solid gray;border-bottom:2px solid white;}}
+label,p{font-size:22px;user-select:none;margin-right:16px;}
+input[type="checkbox"]{width:30px;height:30px;margin-left:15px;}
+div{width:620px;display:flex;align-items:center;margin-bottom:10px;}
+#script{font-size:22px;font-family:monospace;padding:6px 14px;border:1px solid gray;border-bottom:none;}
+.if{background:black;font-size:20px;margin:0;width:fit-content;cursor:pointer;border:2px solid #414141;padding:2px 10px;border-radius:10px 10px 0 0;user-select:none;
+&:hover{background:#3d3d3d;}}
+#interfaces{margin:0;}
+#if-data{margin:0 70px 20px;border:2px solid #414141;padding:10px 15px;width:540px;flex-direction:column;transition:1s linear;height:0;display:none
+;&>div{width:fit-content;}
+& button,input,label{margin:0 5px;}}
+#netmask{width:60px;height:25px;margin:0 !important;}
+
+</style>
+</head>
+<body>
+    <h1 class="rainbow">Alapkonfig generator</h1>
+    <div><label for="ho">Hostname:</label><input type="text" id="ho">
+    <button style="margin-left:10px;" onclick="document.getElementById('ho').value='Switch';document.getElementById('ho').focus();">Switch</button>
+    <button onclick="document.getElementById('ho').value='Router';document.getElementById('ho').focus();">Router</button>
+    <button onclick="document.getElementById('ho').value='S1';document.getElementById('ho').focus();">S1</button>
+    <button onclick="document.getElementById('ho').value='R1';document.getElementById('ho').focus();">R1</button>
+    <input type="checkbox" id="includeho" checked="true">
+    </div>
+    <div><label for="enpass">Enable password:</label><input value="class" type="text" id="enpass" onfocus="this.select()">
+    <input type="checkbox" id="includeenpass" checked="true">
+    </div>
+    <div><label for="linepass">Line password:</label><input value="cisco" type="text" id="linepass" onfocus="this.select()">
+    </div>
+    <div><label for="banner">Banner üzenet:</label><input value="TILOS A BELEPES!" type="text" id="banner" onfocus="this.select()" style="font-size:18px;">
+        <input type="checkbox" id="includebanner" checked="true">
+    </div>
+<div id="interfaces"><p>Interfaces:</p><button onclick="createInt()" id="addif">+</button></div>
+<div id="if-data">
+    <div>
+    <label for="if-name">name:</label><input type="text" id="if-name" oninput="changeIntData(this,0)">
+        <button onclick="document.getElementById('if-name').value='vlan1';document.getElementById('if-name').focus();changeIntData(document.getElementById('if-name'),0);">vlan1</button>
+        <button onclick="document.getElementById('if-name').value='g0/';document.getElementById('if-name').focus();changeIntData(document.getElementById('if-name'),0);">g0/</button>
+    </div>
+    <div>
+        <label for="if-ip">ip address:</label><input type="text" id="if-ip" oninput="changeIntData(this,1)">
+    </div>
+    <div>
+        <label for="if-ip" style="margin:0;line-height:25px;">netmask: 255.255.255.</label><input type="text" id="netmask" value="0">
+    </div>
+</div>
+<div><label for="defgate">Default gateway:</label><input value="" type="text" id="defgate" onfocus="this.select()">
+    <input type="checkbox" id="includedefgate" checked="true">
+</div>
+
+<button id="copy" onclick="copy()">copy to clipboard</button>
+<button id="gen" onclick="generate()">Generate</button>
+<div id="script"></div>
+
+
+
+<script>let script = document.getElementById("script");let int=[];let red=[];
+function generate(){
+    try{
+script.innerHTML="";
+addLine("enable");
+addLine("conf t");
+addLine2("hostname","ho");
+addLine2("enable secret","enpass");
+addLine("line cons 0");
+addLine2("password","linepass");
+addLine("login");
+addLine("logging synchronous");
+addLine("exit");
+addLine("line vty 0 15");
+addLine2("password","linepass");
+addLine("login");
+addLine("logging synchronous");
+addLine("exit");
+addLine("service password-encryption");
+addLineBanner("banner motd","banner");
+for(let i=0;i<int.length/2;i++){
+    red[i]=false;
+    document.getElementById("if-ip").style.borderColor = "white";
+    document.getElementById("if-ip").style.boxShadow = "none";
+    let name=int[(i+1)*2-2];
+    let ip=int[(i+1)*2-1];
+    if(name!=""){
+        if(ip!="" && ip.split(".").length==4){
+            addLine(`int ${name}`);
+            addLine(`ip address ${ip} 255.255.255.${getValue('netmask')}`);
+            addLine('no shutdown');
+            addLine('exit');
+        }else{
+            changeInt(document.getElementById(`if${i+1}`));
+            document.getElementById("if-ip").style.borderColor = "red";
+            document.getElementById("if-ip").style.boxShadow = "0px 0px 17px 3px red";
+            red[i]=true;
+            throw new Error(`int ${i+1}`);
+        }
+    }
+}
+addLine2('ip default-gateway',"defgate");
+addLine('do wr');
+
+} catch (error){
+    console.log(`error at: #${error.message}`);
+}
+}
+function addLine(txt){
+    script.innerHTML += `${txt} <br>`;
+}
+function addLine2(txt,id){
+    document.getElementById(id).style.borderColor = "white";
+    document.getElementById(id).style.boxShadow = "none";
+    var checkbox=document.getElementById(`include${id}`);
+    if(checkbox==null || checkbox.checked==true){
+        if(getValue(id)!=""){
+            script.innerHTML += `${txt} ${getValue(id)} <br>`;
+        }else{
+            script.innerHTML="";
+            document.getElementById(id).style.borderColor = "red";
+            document.getElementById(id).style.boxShadow = "0px 0px 17px 3px red";
+            throw new Error(id);
+        }
+    }
+}
+function getValue(id){
+    return document.getElementById(id).value;
+}
+window.addEventListener("keydown",function(e){
+    if(e.key=="q"){
+        if(document.activeElement){
+            document.activeElement.blur();
+        }
+        generate();
+    }
+},true)
+function addLineBanner(txt,id){
+    document.getElementById(id).style.borderColor = "white";
+    document.getElementById(id).style.boxShadow = "none";
+    var checkbox=document.getElementById(`include${id}`);
+    if(checkbox==null || checkbox.checked==true){
+        if(getValue(id)!=""){
+            script.innerHTML += `${txt} #${getValue(id)}# <br>`;
+        }else{
+            script.innerHTML="";
+            document.getElementById(id).style.borderColor = "red";
+            document.getElementById(id).style.boxShadow = "0px 0px 17px 3px red";
+            throw new Error(id);
+        }
+    }
+}
+function createInt(){
+    int.push("");
+    int.push("");
+    red.push("");
+    document.getElementById("interfaces").removeChild(document.getElementById('addif'));
+    document.getElementById("interfaces").innerHTML+=`<div class="if" onclick="changeInt(this)" id="if${int.length/2}">int ${int.length/2}</div><button id="addif" onclick="createInt()">+</button>`;
+    changeInt(document.getElementById(`if${int.length/2}`));
+}
+function changeInt(el){
+    let ifs=document.getElementsByClassName('if');
+    for (let i=0;i<ifs.length;i++){
+        ifs[i].style.background='black';
+    }
+    el.style.background='#414141';
+    document.getElementById("if-data").style.display="flex";
+    document.getElementById("if-data").style.height="auto";
+    document.getElementById("if-name").value=int[el.id.slice(2)*2-2];
+    document.getElementById("if-ip").value=int[el.id.slice(2)*2-1];
+    if(red[el.id.slice(2)*1-1]){
+        document.getElementById("if-ip").style.borderColor = "red";
+        document.getElementById("if-ip").style.boxShadow = "0px 0px 17px 3px red";
+    }else{
+        document.getElementById("if-ip").style.borderColor = "white";
+        document.getElementById("if-ip").style.boxShadow = "none";
+    }
+    
+    
+}
+function changeIntData(el,idk){
+    let intnum = null;
+    let ifs=document.getElementsByClassName('if');
+    for (let i=0;i<ifs.length;i++){
+        if(ifs[i].style.background=='rgb(65, 65, 65)'){
+            intnum = i;
+        }
+    }
+    int[intnum*2+idk]=el.value;
+    if(idk==0 && el.value!=""){
+        ifs[intnum].innerHTML=el.value;
+    }else if(idk==0){
+        ifs[intnum].innerHTML=`int ${intnum+1}`;
+    }else if(idk==1){
+        let values=el.value.split(".");
+        if(values.length==4 && int[intnum*2]=="vlan1"){
+            document.getElementById('defgate').value=el.value.slice(0,el.value.length-values[3].length) + "1";
+        }
+    }
+}
+function copy(){
+if(script.innerHTML.length>1){
+    navigator.clipboard.writeText(script.innerHTML.replace(/<br\s*\/?>/gi,'\n'))
+        .then(() => {
+          console.log('Text copied to clipboard successfully!');
+        })
+        .catch(err => {
+          console.error('Failed to copy text: ', err);
+        });
+}}
+
+
+function delInt(){
+    let intnum = null;
+    let ifs=document.getElementsByClassName('if');
+    for (let i=0;i<ifs.length;i++){
+        if(ifs[i].style.background=='rgb(65, 65, 65)'){
+            intnum = i;
+        }
+    }
+    int[intnum*2-1] = "";
+    int[intnum*2] = "";
+    
+    document.getElementById('interfaces').removeChild(document.getElementById(`if${intnum+1}`))
+}
+</script>
+</body>
+</html>
