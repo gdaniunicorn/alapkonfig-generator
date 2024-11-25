@@ -14,14 +14,14 @@ label,p{font-size:22px;user-select:none;margin-right:16px;}
 input[type="checkbox"]{width:30px;height:30px;margin-left:15px;}
 div{width:620px;display:flex;align-items:center;margin-bottom:10px;}
 #script{font-size:22px;font-family:monospace;padding:6px 14px;border:1px solid gray;border-bottom:none;}
-.if{background:black;font-size:20px;margin:0;width:fit-content;cursor:pointer;border:2px solid #414141;padding:2px 10px;border-radius:10px 10px 0 0;user-select:none;
+.if,.dhcp{background:black;font-size:20px;margin:0;width:fit-content;cursor:pointer;border:2px solid #414141;padding:2px 10px;border-radius:10px 10px 0 0;user-select:none;
 &:hover{background:#3d3d3d;}}
-#interfaces{margin:0;}
-#if-data{margin:0 70px 20px;border:2px solid #414141;padding:10px 15px;width:540px;flex-direction:column;transition:1s linear;height:0;display:none
+#interfaces,#dhcps{margin:0;}
+#if-data,#dhcp-data{margin:0 70px 20px;border:2px solid #414141;padding:10px 15px;width:540px;flex-direction:column;transition:1s linear;height:0;display:none
 ;&>div{width:fit-content;}
 & button,input,label{margin:0 5px;}}
 #netmask{width:60px;height:25px;margin:0 !important;}
-
+#dhcp-data{width:620px;align-items: flex-start;}
 </style>
 </head>
 <body>
@@ -55,9 +55,31 @@ div{width:620px;display:flex;align-items:center;margin-bottom:10px;}
         <label for="if-ip" style="margin:0;line-height:25px;">netmask: 255.255.255.</label><input type="text" id="netmask" value="0">
     </div>
 </div>
+
 <div><label for="defgate">Default gateway:</label><input value="" type="text" id="defgate" onfocus="this.select()">
     <input type="checkbox" id="includedefgate" checked="true">
 </div>
+
+
+<div id="dhcps"><p>DHCP:</p><button onclick="createDHCP()" id="adddhcp">+</button></div>
+<div id="dhcp-data">
+    <div>
+    <label for="exadd1">Excluded address:</label><input type="text" id="exadd1" oninput="changeDHCPData(this,1)"><label>-</label><input type="text" id="exadd2" oninput="changeDHCPData(this,2)">
+    </div>
+    <div>
+        <label for="pool">Pool name:</label><input type="text" id="pool" oninput="changeDHCPData(this,3)" onfocus="this.select()">
+    </div>
+    <div>
+        <label for="network1">Network:</label><input type="text" id="network1" oninput="changeDHCPData(this,4)"><label for="network2" style="margin:0;line-height:25px;">netmask:</label><input type="text" oninput="changeDHCPData(this,5)" id="network2" value="255.255.255.0">
+    </div>
+    <div>
+        <label for="defr">Default router:</label><input value="" type="text" id="defr" oninput="changeDHCPData(this,6)">
+    </div>
+    <div>
+        <label for="dns">DNS server:</label><input value="8.8.8.8" type="text" id="dns" oninput="changeDHCPData(this,7)">
+    </div>
+</div>
+
 
 <button id="copy" onclick="copy()">copy to clipboard</button>
 <button id="gen" onclick="generate()">Generate</button>
@@ -65,7 +87,19 @@ div{width:620px;display:flex;align-items:center;margin-bottom:10px;}
 
 
 
-<script>let script = document.getElementById("script");let int=[];let red=[];
+
+
+
+
+
+
+
+
+
+
+
+
+<script>let script = document.getElementById("script");let int=[];let red=[];let dhcp=[];
 function generate(){
     try{
 script.innerHTML="";
@@ -106,7 +140,19 @@ for(let i=0;i<int.length/2;i++){
         }
     }
 }
+
 addLine2('ip default-gateway',"defgate");
+
+for(let i=0;i<int.length/2;i++){
+    if(dhcp[i*7+2]!=""){
+        addLine(`ip dhcp excluded-address ${dhcp[i*7+0]} ${dhcp[i*7+1]}`);
+        addLine(`ip dhcp pool ${dhcp[i*7+2]}`);
+        addLine(`network ${dhcp[i*7+3]} ${dhcp[i*7+4]}`);
+        addLine(`default-router ${dhcp[i*7+5]}`);
+        addLine(`dns-server ${dhcp[i*7+6]}`);
+        addLine('exit');
+    }
+}
 addLine('do wr');
 
 } catch (error){
@@ -216,6 +262,82 @@ if(script.innerHTML.length>1){
         });
 }}
 
+
+
+
+// 1. excluded-address 1   #exadd1
+// 2. excluded-address 2   #exadd2
+// 3. pool-name            #pool
+// 4. network              #network1
+// 5. netmask              #network2
+// 6. default-router       #defr
+// 7. dns-server           #dns
+
+
+function createDHCP(){
+    dhcp.push("");
+    dhcp.push("");
+    dhcp.push("");
+    dhcp.push("");
+    dhcp.push("255.255.255.0");
+    dhcp.push("");
+    dhcp.push("8.8.8.8");
+    document.getElementById("dhcps").removeChild(document.getElementById('adddhcp'));
+    document.getElementById("dhcps").innerHTML+=`<div class="dhcp" onclick="changeDHCP(this)" id="dhcp${dhcp.length/7}">pool${dhcp.length/7}</div><button id="adddhcp" onclick="createDHCP()">+</button>`;
+    dhcp[dhcp.length-5] = `pool${dhcp.length/7}`;
+    changeDHCP(document.getElementById(`dhcp${dhcp.length/7}`));
+}
+function changeDHCP(el){
+    let dhcps=document.getElementsByClassName('dhcp');
+    for (let i=0;i<dhcps.length;i++){
+        dhcps[i].style.background='black';
+    }
+    el.style.background='#414141';
+    document.getElementById("dhcp-data").style.display="flex";
+    document.getElementById("dhcp-data").style.height="auto";
+    document.getElementById("exadd1").value=dhcp[el.id.slice(4)*7-7];
+    document.getElementById("exadd2").value=dhcp[el.id.slice(4)*7-6];
+    document.getElementById("pool").value=dhcp[el.id.slice(4)*7-5];
+    document.getElementById("network1").value=dhcp[el.id.slice(4)*7-4];
+    document.getElementById("network2").value=dhcp[el.id.slice(4)*7-3];
+    document.getElementById("defr").value=dhcp[el.id.slice(4)*7-2];
+    document.getElementById("dns").value=dhcp[el.id.slice(4)*7-1];
+}
+function changeDHCPData(el,idk){
+    let dhcpnum = null;
+    let dhcps=document.getElementsByClassName('dhcp');
+    for (let i=0;i<dhcps.length;i++){
+        if(dhcps[i].style.background=='rgb(65, 65, 65)'){
+            dhcpnum = i;
+        }
+    }
+    dhcp[dhcpnum*7+(idk-1)]=el.value;
+    
+    if(idk==3 && el.value!=""){
+        dhcps[dhcpnum].innerHTML=el.value;
+    }else if(idk==0){
+        dhcps[dhcpnum].innerHTML=`dhcp${dhcpnum+1}`;
+    }else if(idk==1){
+        let values=el.value.split(".");
+        if(values.length==4){
+            document.getElementById('exadd2').value=el.value.slice(0,el.value.length-values[3].length);
+            dhcp[dhcpnum*7+1]=el.value.slice(0,el.value.length-values[3].length);
+            document.getElementById('network1').value=el.value.slice(0,el.value.length-values[3].length) + "0";
+            dhcp[dhcpnum*7+3]=el.value.slice(0,el.value.length-values[3].length) + "0";
+            document.getElementById('defr').value=el.value.slice(0,el.value.length-values[3].length) + "1";
+            dhcp[dhcpnum*7+5]=el.value.slice(0,el.value.length-values[3].length) + "1";
+        }
+    }
+}
+
+
+
+
+
+
+//\\//\\//\\//\\//\\//\\//\\/\
+//NOT YET WORKING (WON'T FIX)|
+//\\//\\//\\//\\//\\//\\//\\//
 
 function delInt(){
     let intnum = null;
